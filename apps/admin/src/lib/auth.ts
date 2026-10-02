@@ -1,5 +1,9 @@
 export const SESSION_COOKIE = "rx_admin";
 export const SESSION_TTL_S = 60 * 60 * 12;
+// по http (без домена/сертификата) secure-cookie браузер не сохранит — тогда ADMIN_COOKIE_SECURE=false
+export const SESSION_COOKIE_SECURE = process.env.ADMIN_COOKIE_SECURE
+  ? process.env.ADMIN_COOKIE_SECURE === "true"
+  : process.env.NODE_ENV === "production";
 
 const enc = new TextEncoder();
 

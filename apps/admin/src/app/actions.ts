@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { createSession, SESSION_COOKIE, SESSION_TTL_S } from "@/lib/auth";
+import { createSession, SESSION_COOKIE, SESSION_COOKIE_SECURE, SESSION_TTL_S } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { homeFor } from "@/lib/rbac";
 import { auditAdmin } from "@/lib/audit-emit";
@@ -27,7 +27,7 @@ export async function login(_: LoginState, form: FormData): Promise<LoginState> 
   (await cookies()).set(SESSION_COOKIE, await createSession(res.user.id, res.user.sessionVersion), {
     httpOnly: true,
     sameSite: "strict",
-    secure: process.env.NODE_ENV === "production",
+    secure: SESSION_COOKIE_SECURE,
     path: "/",
     maxAge: SESSION_TTL_S,
   });

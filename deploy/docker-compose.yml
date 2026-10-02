@@ -129,6 +129,7 @@ services:
       AUDIT_INGEST_TOKEN: ${AUDIT_INGEST_TOKEN}
       ADMIN_API_TOKEN: ${ADMIN_API_TOKEN}
       ADMIN_SESSION_SECRET: ${ADMIN_SESSION_SECRET}
+      ADMIN_COOKIE_SECURE: ${ADMIN_COOKIE_SECURE:-true}
       # владельцы: при каждом старте — super admin, без блокировки
       ADMIN_USERS: ${ADMIN_USERS}
     ports:

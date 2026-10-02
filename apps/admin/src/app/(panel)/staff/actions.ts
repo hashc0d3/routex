@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { createSession, SESSION_COOKIE, SESSION_TTL_S } from "@/lib/auth";
+import { createSession, SESSION_COOKIE, SESSION_COOKIE_SECURE, SESSION_TTL_S } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { ASSIGNABLE_ROLES, canManage, type Role } from "@/lib/rbac";
 import { requireStaff } from "@/lib/staff";
@@ -122,7 +122,7 @@ export async function changeOwnPassword(_: FormState, form: FormData): Promise<F
   (await cookies()).set(SESSION_COOKIE, await createSession(updated.id, updated.sessionVersion), {
     httpOnly: true,
     sameSite: "strict",
-    secure: process.env.NODE_ENV === "production",
+    secure: SESSION_COOKIE_SECURE,
     path: "/",
     maxAge: SESSION_TTL_S,
   });
