@@ -1,5 +1,12 @@
 # Единственная точка входа снаружи (80/443). Домен в SITE_ADDRESS → Caddy сам выпустит HTTPS.
 # Админка и Grafana наружу не публикуются: только через SSH-туннель (см. docker-compose.yml).
+{
+	servers {
+		# если впереди стоит nginx хоста — верить его X-Forwarded-For (он приходит с приватного адреса docker-сети)
+		trusted_proxies static private_ranges
+	}
+}
+
 {$SITE_ADDRESS::80} {
 	encode zstd gzip
 

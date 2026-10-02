@@ -21,7 +21,8 @@ x-service: &service
     options: { max-size: "20m", max-file: "5" }
 
 x-common-env: &common-env
-  TRUST_PROXY: "1"
+  # число прокси перед сервисами: Caddy = 1; Caddy за nginx хоста = 2
+  TRUST_PROXY: ${TRUST_PROXY:-1}
   CORS_ORIGINS: ${PUBLIC_ORIGIN}
   ADMIN_API_TOKEN: ${ADMIN_API_TOKEN}
   AUDIT_URL: http://audit:4020
@@ -171,9 +172,10 @@ services:
     environment:
       SITE_ADDRESS: ${SITE_ADDRESS}
     ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
+      # за nginx хоста: HTTP_BIND=127.0.0.1:8080, HTTPS_BIND=127.0.0.1:8443
+      - "${HTTP_BIND:-80}:80"
+      - "${HTTPS_BIND:-443}:443"
+      - "${HTTPS_BIND:-443}:443/udp"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
