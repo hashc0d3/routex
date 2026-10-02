@@ -23,6 +23,7 @@ import { type PaidPlan, PurchaseConfirm } from "@/components/PurchaseConfirm";
 import { AccountSkeleton } from "@/components/Skeleton";
 import { achievementState, NICKNAME_MAX, nicknameError } from "@/lib/achievements";
 import { clientApi, getAccessToken, usesLiveApi } from "@/lib/api";
+import { copyText } from "@/lib/clipboard";
 import { useLocale } from "@/lib/i18n";
 import { prepareAvatar } from "@/lib/image";
 import { mockHasActiveSession } from "@/lib/mock-api";
@@ -408,8 +409,7 @@ export default function AccountPage() {
             type="button"
             className={`mt-3 ${chip} ${copied ? "border border-emerald-400/50 bg-emerald-400/10 text-emerald-300" : chipGhost}`}
             onClick={() => {
-              void navigator.clipboard.writeText(refLink);
-              setCopied(true);
+              void copyText(refLink).then(setCopied);
             }}
           >
             {copied ? t.copied : t.copy}

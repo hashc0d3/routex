@@ -1,6 +1,7 @@
 import { nicknameError, unlockedCodesFor } from "./achievements";
 import { blobToDataUrl } from "./image";
 import { safeStorage } from "./storage";
+import { uuid } from "./uuid";
 import {
   type Api,
   ApiError,
@@ -108,7 +109,7 @@ function nicknameTaken(db: Db, nickname: string, exceptEmail?: string) {
 
 function notify(row: Row, type: NotificationType, data: AppNotification["data"] = {}) {
   row.notifications.unshift({
-    id: crypto.randomUUID(),
+    id: uuid(),
     type,
     data,
     createdAt: new Date().toISOString(),
@@ -195,7 +196,7 @@ export const mockApi: Api = {
     const row: Row = {
       password: payload.password,
       user: {
-        id: crypto.randomUUID(),
+        id: uuid(),
         email,
         nickname: payload.nickname.trim(),
         avatarUrl: null,
@@ -276,7 +277,7 @@ export const mockApi: Api = {
     if (payload.description.trim().length < 10) throw new ApiError("ticket_description_short");
     if (!token && !payload.contact?.value.trim()) throw new ApiError("ticket_contact_required");
     if (!token && !payload.pdConsent) throw new ApiError("consents_required");
-    return { id: crypto.randomUUID(), number: Math.floor(Date.now() / 1000) % 100000 };
+    return { id: uuid(), number: Math.floor(Date.now() / 1000) % 100000 };
   },
   // без сервиса support заявки нигде не хранятся — переписку показать неоткуда
   async listMyTickets() {
@@ -289,7 +290,7 @@ export const mockApi: Api = {
     throw new ApiError("support_offline");
   },
   async requestPersonalData() {
-    return { id: crypto.randomUUID() };
+    return { id: uuid() };
   },
   async deleteAccount(token) {
     const db = load();
@@ -318,7 +319,7 @@ export const mockApi: Api = {
     if (action === "start") {
       if (row.activeSession) return;
       const game = MOCK_GAMES[Math.floor(Math.random() * MOCK_GAMES.length)];
-      row.activeSession = { id: crypto.randomUUID(), game, startedAt: new Date().toISOString() };
+      row.activeSession = { id: uuid(), game, startedAt: new Date().toISOString() };
       notify(row, "session_started", { game, paths: 3 });
     } else {
       const s = row.activeSession;

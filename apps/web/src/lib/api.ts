@@ -1,5 +1,6 @@
 import { mockApi } from "./mock-api";
 import { safeStorage } from "./storage";
+import { uuid } from "./uuid";
 import { type Api, ApiError, type AppNotification, type Me, type TicketPayload, type User } from "./types";
 
 const TOKEN_KEY = "routex.accessToken";
@@ -234,7 +235,7 @@ const servicesApi: Api = {
     request(`${billingBase()}/v1/billing/mock/pay`, {
       method: "POST",
       token,
-      json: { planCode, idempotencyKey: crypto.randomUUID() },
+      json: { planCode, idempotencyKey: uuid() },
     }),
   listFaq: (locale) => mockApi.listFaq(locale),
   async createTicket(token, payload) {
@@ -254,7 +255,7 @@ const servicesApi: Api = {
       headers: supportAs(token),
       json: { body },
     }),
-  requestPersonalData: async () => ({ id: crypto.randomUUID() }),
+  requestPersonalData: async () => ({ id: uuid() }),
   async listNotifications(token) {
     // identity — источник правды о сессии: его 401 должен разлогинить, остальные ленты необязательны
     const [own, billing, support] = await Promise.all([

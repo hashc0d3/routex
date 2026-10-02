@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useFormStatus } from "react-dom";
+import { copyText } from "@/lib/clipboard";
 import { ASSIGNABLE_ROLES, ROLE_INFO, type Role } from "@/lib/rbac";
 
 export const field =
@@ -49,8 +50,7 @@ export function PasswordReveal({ password }: { password: string }) {
         <button
           type="button"
           onClick={() => {
-            void navigator.clipboard.writeText(password);
-            setCopied(true);
+            void copyText(password).then(setCopied);
           }}
           className={`btn btn-sm ${copied ? "btn-ghost text-emerald-300" : "btn-ghost"}`}
         >
