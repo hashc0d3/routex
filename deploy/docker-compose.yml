@@ -4,6 +4,7 @@
 #
 # Снаружи открыты только 80/443 (Caddy). Админка и Grafana слушают 127.0.0.1 сервера —
 # заходить через SSH-туннель: ssh -L 3001:127.0.0.1:3001 -L 3002:127.0.0.1:3002 user@server
+# (порты на сервере меняются через ADMIN_PORT / GRAFANA_PORT в deploy/.env)
 name: routex
 
 x-build: &build
@@ -130,7 +131,7 @@ services:
       # владельцы: при каждом старте — super admin, без блокировки
       ADMIN_USERS: ${ADMIN_USERS}
     ports:
-      - "127.0.0.1:3001:3001"
+      - "127.0.0.1:${ADMIN_PORT:-3001}:3001"
 
   loki:
     image: grafana/loki:3.7.8
@@ -161,7 +162,7 @@ services:
       - ./observability/grafana/dashboards:/var/lib/routex-dashboards:ro
       - grafana-data:/var/lib/grafana
     ports:
-      - "127.0.0.1:3002:3000"
+      - "127.0.0.1:${GRAFANA_PORT:-3002}:3000"
 
   caddy:
     image: caddy:2-alpine
