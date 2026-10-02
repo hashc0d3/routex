@@ -1,0 +1,157 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  /* высота строки шапки (60px) + нижняя граница (1px) */
+  --header-h: 61px;
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 72px;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  background: #050506;
+  color: #fff;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  @apply underline-offset-4;
+}
+
+.rx-grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse at 50% 40%, #000 30%, transparent 75%);
+}
+
+.rx-marquee:hover .animate-marquee,
+.rx-marquee:hover .animate-marquee-rev {
+  animation-play-state: paused;
+}
+
+/* Плёночный шум поверх всего сайта */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+  opacity: 0.06;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Сканлайны для картинок и экранов */
+.rx-scan {
+  background-image: repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.035) 0 1px, transparent 1px 3px);
+}
+
+/* HUD-уголки: 4 красных уголка без влияния на background-color */
+.rx-hud {
+  --c: rgba(225, 6, 0, 0.9);
+  --l: 14px;
+  --w: 2px;
+  background-image:
+    linear-gradient(var(--c), var(--c)), linear-gradient(var(--c), var(--c)),
+    linear-gradient(var(--c), var(--c)), linear-gradient(var(--c), var(--c)),
+    linear-gradient(var(--c), var(--c)), linear-gradient(var(--c), var(--c)),
+    linear-gradient(var(--c), var(--c)), linear-gradient(var(--c), var(--c));
+  background-repeat: no-repeat;
+  background-size:
+    var(--l) var(--w), var(--w) var(--l),
+    var(--l) var(--w), var(--w) var(--l),
+    var(--l) var(--w), var(--w) var(--l),
+    var(--l) var(--w), var(--w) var(--l);
+  background-position:
+    0 0, 0 0,
+    100% 0, 100% 0,
+    0 100%, 0 100%,
+    100% 100%, 100% 100%;
+}
+
+.rx-hud-soft {
+  --c: rgba(255, 255, 255, 0.28);
+}
+
+/* Скошенные углы, как у X в логотипе */
+.rx-cut {
+  clip-path: polygon(18px 0, 100% 0, 100% calc(100% - 18px), calc(100% - 18px) 100%, 0 100%, 0 18px);
+}
+
+.rx-cut-sm {
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+}
+
+/* Глитч для акцентного слова в заголовке */
+.rx-glitch {
+  position: relative;
+  display: inline-block;
+}
+
+.rx-glitch::before,
+.rx-glitch::after {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.rx-glitch::before {
+  color: #ff2b2b;
+  transform: translate(2px, 0);
+  mix-blend-mode: screen;
+  opacity: 0.7;
+  animation: rx-glitch-a 3.2s steps(1) infinite;
+}
+
+.rx-glitch::after {
+  color: #ffffff;
+  transform: translate(-2px, 0);
+  opacity: 0.25;
+  animation: rx-glitch-b 3.2s steps(1) infinite;
+}
+
+@keyframes rx-glitch-a {
+  0%, 86%, 100% { clip-path: inset(0 0 100% 0); }
+  87% { clip-path: inset(10% 0 60% 0); transform: translate(4px, -1px); }
+  89% { clip-path: inset(55% 0 20% 0); transform: translate(-3px, 1px); }
+  91% { clip-path: inset(30% 0 45% 0); transform: translate(3px, 0); }
+  93% { clip-path: inset(0 0 100% 0); }
+}
+
+@keyframes rx-glitch-b {
+  0%, 87%, 100% { clip-path: inset(0 0 100% 0); }
+  88% { clip-path: inset(65% 0 10% 0); transform: translate(-4px, 1px); }
+  90% { clip-path: inset(20% 0 65% 0); transform: translate(3px, 0); }
+  92% { clip-path: inset(0 0 100% 0); }
+}
+
+/* Тонкие диагональные полосы — фон для плашек */
+.rx-stripes {
+  background-image: repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.04) 0 2px, transparent 2px 9px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

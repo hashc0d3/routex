@@ -1,0 +1,25 @@
+# Единственная точка входа снаружи (80/443). Домен в SITE_ADDRESS → Caddy сам выпустит HTTPS.
+# Админка и Grafana наружу не публикуются: только через SSH-туннель (см. docker-compose.yml).
+{$SITE_ADDRESS::80} {
+	encode zstd gzip
+
+	# служебные ручки сервисов (токен админки / межсервисный приём событий) — только внутри docker-сети
+	@internal path /api/support/v1/admin/* /api/identity/v1/admin/* /api/billing/v1/admin/* /api/audit/v1/admin/* /api/audit/v1/audit/events
+	respond @internal 404
+
+	handle_path /api/support/* {
+		reverse_proxy support:4010
+	}
+	handle_path /api/identity/* {
+		reverse_proxy identity:4030
+	}
+	handle_path /api/billing/* {
+		reverse_proxy billing:4040
+	}
+	handle_path /api/audit/* {
+		reverse_proxy audit:4020
+	}
+	handle {
+		reverse_proxy web:3000
+	}
+}

@@ -1,0 +1,8 @@
+* text=auto
+# скрипты и конфиги для Linux-сервера — всегда с LF, иначе bash/Caddy спотыкаются о \r
+*.sh text eol=lf
+deploy/** text eol=lf
+*.png binary
+*.webp binary
+*.jpg binary
+*.ico binary

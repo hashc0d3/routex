@@ -1,0 +1,23 @@
+name: routex
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: routex-postgres
+    environment:
+      POSTGRES_DB: routex
+      POSTGRES_USER: routex
+      POSTGRES_PASSWORD: routex
+    ports:
+      - "5433:5432"
+    volumes:
+      - routex-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U routex -d routex"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  routex-pg:

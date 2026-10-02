@@ -1,0 +1,184 @@
+# RouteX на одном Debian-сервере. Запуск из каталога deploy/:
+#   ./gen-env.sh                       один раз — создаёт .env с секретами
+#   docker compose up -d --build       собрать и запустить (повторять после git pull)
+#
+# Снаружи открыты только 80/443 (Caddy). Админка и Grafana слушают 127.0.0.1 сервера —
+# заходить через SSH-туннель: ssh -L 3001:127.0.0.1:3001 -L 3002:127.0.0.1:3002 user@server
+name: routex
+
+x-build: &build
+  context: ..
+  dockerfile: deploy/docker/Dockerfile
+
+x-service: &service
+  restart: unless-stopped
+  depends_on:
+    postgres:
+      condition: service_healthy
+  logging:
+    driver: json-file
+    options: { max-size: "20m", max-file: "5" }
+
+x-common-env: &common-env
+  TRUST_PROXY: "1"
+  CORS_ORIGINS: ${PUBLIC_ORIGIN}
+  ADMIN_API_TOKEN: ${ADMIN_API_TOKEN}
+  AUDIT_URL: http://audit:4020
+  AUDIT_INGEST_TOKEN: ${AUDIT_INGEST_TOKEN}
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: routex
+      POSTGRES_USER: routex
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    # для psql/бэкапов с самого сервера; наружу не торчит
+    ports:
+      - "127.0.0.1:5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U routex -d routex"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  support:
+    <<: *service
+    build: { <<: *build, args: { WORKSPACE: services/support } }
+    image: routex/support
+    command: sh -c "npx prisma migrate deploy && node dist/main.js"
+    environment:
+      <<: *common-env
+      DATABASE_URL: postgresql://routex:${POSTGRES_PASSWORD}@postgres:5432/routex?schema=support
+      PORT: "4010"
+      SERVICE_NAME: support
+
+  identity:
+    <<: *service
+    build: { <<: *build, args: { WORKSPACE: services/identity } }
+    image: routex/identity
+    command: sh -c "npx prisma migrate deploy && node dist/main.js"
+    environment:
+      <<: *common-env
+      DATABASE_URL: postgresql://routex:${POSTGRES_PASSWORD}@postgres:5432/routex?schema=identity
+      PORT: "4030"
+      PUBLIC_URL: ${PUBLIC_ORIGIN}/api/identity
+      AUTH_TOKEN_SECRET: ${AUTH_TOKEN_SECRET}
+      SERVICE_NAME: identity
+
+  billing:
+    <<: *service
+    build: { <<: *build, args: { WORKSPACE: services/billing } }
+    image: routex/billing
+    command: sh -c "npx prisma migrate deploy && node dist/main.js"
+    environment:
+      <<: *common-env
+      DATABASE_URL: postgresql://routex:${POSTGRES_PASSWORD}@postgres:5432/routex?schema=billing
+      PORT: "4040"
+      PROVIDER: mock
+      AUTH_TOKEN_SECRET: ${AUTH_TOKEN_SECRET}
+      SERVICE_NAME: billing
+
+  audit:
+    <<: *service
+    build: { <<: *build, args: { WORKSPACE: services/audit } }
+    image: routex/audit
+    command: sh -c "npx prisma migrate deploy && node dist/main.js"
+    environment:
+      <<: *common-env
+      DATABASE_URL: postgresql://routex:${POSTGRES_PASSWORD}@postgres:5432/routex?schema=audit
+      PORT: "4020"
+      SERVICE_NAME: audit
+      LOKI_URL: http://loki:3100
+
+  web:
+    restart: unless-stopped
+    build:
+      <<: *build
+      args:
+        WORKSPACE: apps/web
+        NEXT_PUBLIC_SUPPORT_API_URL: ${PUBLIC_ORIGIN}/api/support
+        NEXT_PUBLIC_IDENTITY_API_URL: ${PUBLIC_ORIGIN}/api/identity
+        NEXT_PUBLIC_BILLING_API_URL: ${PUBLIC_ORIGIN}/api/billing
+        NEXT_PUBLIC_AUDIT_API_URL: ${PUBLIC_ORIGIN}/api/audit
+        NEXT_PUBLIC_SITE_URL: ${PUBLIC_ORIGIN}
+    image: routex/web
+    command: npx next start --port 3000
+    logging:
+      driver: json-file
+      options: { max-size: "20m", max-file: "5" }
+
+  admin:
+    <<: *service
+    build: { <<: *build, args: { WORKSPACE: apps/admin } }
+    image: routex/admin
+    command: sh -c "npx prisma migrate deploy && npx next start --port 3001"
+    environment:
+      DATABASE_URL: postgresql://routex:${POSTGRES_PASSWORD}@postgres:5432/routex?schema=admin
+      SUPPORT_API_URL: http://support:4010
+      IDENTITY_API_URL: http://identity:4030
+      BILLING_API_URL: http://billing:4040
+      AUDIT_URL: http://audit:4020
+      AUDIT_INGEST_TOKEN: ${AUDIT_INGEST_TOKEN}
+      ADMIN_API_TOKEN: ${ADMIN_API_TOKEN}
+      ADMIN_SESSION_SECRET: ${ADMIN_SESSION_SECRET}
+      # владельцы: при каждом старте — super admin, без блокировки
+      ADMIN_USERS: ${ADMIN_USERS}
+    ports:
+      - "127.0.0.1:3001:3001"
+
+  loki:
+    image: grafana/loki:3.7.8
+    restart: unless-stopped
+    command: ["-config.file=/etc/loki/routex.yaml", "-config.expand-env=true"]
+    volumes:
+      - ./observability/loki.yaml:/etc/loki/routex.yaml:ro
+      - loki-data:/loki
+
+  grafana:
+    image: grafana/grafana:13.2.3
+    restart: unless-stopped
+    depends_on: [loki]
+    environment:
+      LOKI_URL: http://loki:3100
+      ROUTEX_DASHBOARDS: /var/lib/routex-dashboards
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_USERS_DEFAULT_LANGUAGE: ru-RU
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_NEWS_NEWS_FEED_ENABLED: "false"
+      GF_PLUGINS_PREINSTALL_DISABLED: "true"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/routex-dashboards/routex-events.json
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/routex-dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "127.0.0.1:3002:3000"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on: [web, support, identity, billing, audit]
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  pg-data:
+  loki-data:
+  grafana-data:
+  caddy-data:
+  caddy-config:

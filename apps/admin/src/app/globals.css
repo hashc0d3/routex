@@ -1,0 +1,65 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  background: #050506;
+  color: #fff;
+  -webkit-font-smoothing: antialiased;
+}
+
+.rx-cut-sm {
+  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex shrink-0 select-none items-center justify-center gap-2 px-4 py-2.5 text-xs font-semibold uppercase tracking-[0.14em] transition duration-200 disabled:pointer-events-none disabled:opacity-40;
+    clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+  }
+  .btn-sm {
+    @apply gap-1.5 px-3 py-1.5 text-[11px];
+    clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
+  }
+  .btn-primary {
+    @apply bg-gradient-to-r from-rx-red to-rx-red2 text-white shadow-[0_8px_24px_-12px_rgba(225,6,0,0.9)] hover:brightness-110 active:brightness-95;
+  }
+  .btn-ghost {
+    @apply bg-white/[0.04] text-white/75 hover:bg-white/[0.09] hover:text-white;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+  }
+  .btn-ghost:hover {
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+  }
+  .btn-danger {
+    @apply bg-rx-red/[0.08] text-rx-red2 hover:bg-rx-red hover:text-white;
+    box-shadow: inset 0 0 0 1px rgba(225, 6, 0, 0.5);
+  }
+  /* «← Назад»: стрелка в рамке, сдвигается при наведении */
+  .link-back {
+    @apply inline-flex items-center gap-2.5 text-xs font-semibold uppercase tracking-[0.16em] text-white/50 transition hover:text-white;
+  }
+  .link-back .arrow {
+    @apply flex h-7 w-7 items-center justify-center border border-white/15 transition duration-200;
+  }
+  .link-back:hover .arrow {
+    @apply -translate-x-0.5 border-rx-red/70 bg-rx-red/10 text-rx-red2;
+  }
+  .btn .arrow-r {
+    @apply transition-transform duration-200;
+  }
+  .btn:hover .arrow-r {
+    @apply translate-x-0.5;
+  }
+}
+
+.rx-grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+}

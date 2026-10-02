@@ -1,0 +1,86 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TicketStatus {
+  open
+  in_progress
+  waiting
+  resolved
+  closed
+}
+
+enum TicketSource {
+  web
+  app
+}
+
+enum TicketAuthor {
+  user
+  staff
+  /// Смена статуса: body = новый статус, текст собирает клиент на своём языке.
+  system
+}
+
+model Ticket {
+  id              String          @id @default(uuid()) @db.Uuid
+  number          Int             @unique @default(autoincrement())
+  source          TicketSource    @default(web)
+  status          TicketStatus    @default(open)
+  subject         String
+  /// Снимок автора на момент заявки: identity живёт в другой схеме, join'ов нет.
+  userId          String?         @map("user_id")
+  userNickname    String?         @map("user_nickname")
+  userEmail       String?         @map("user_email")
+  contactPhone    String?         @map("contact_phone")
+  contactNickname String?         @map("contact_nickname")
+  locale          String          @default("ru")
+  page            String?
+  /// Согласие гостя на обработку ПДн (152-ФЗ); у авторизованных оно взято при регистрации.
+  pdConsentAt     DateTime?       @map("pd_consent_at")
+  attachOk        Boolean         @default(false) @map("attach_ok")
+  /// Для бейджей «новый ответ»: последнее сообщение каждой стороны и когда сторона открывала чат.
+  lastUserAt      DateTime        @default(now()) @map("last_user_at")
+  lastStaffAt     DateTime?       @map("last_staff_at")
+  userSeenAt      DateTime?       @map("user_seen_at")
+  staffSeenAt     DateTime?       @map("staff_seen_at")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+  messages        TicketMessage[]
+
+  @@index([status, createdAt(sort: Desc)])
+  @@index([userId])
+  @@map("tickets")
+}
+
+/// Временно здесь: по SERVICES.md уведомления живут в identity; переедут, когда он появится.
+model UserNotification {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id")
+  /// ticket_reply | ticket_status
+  type      String
+  data      Json      @default("{}")
+  createdAt DateTime  @default(now()) @map("created_at")
+  readAt    DateTime? @map("read_at")
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("user_notifications")
+}
+
+model TicketMessage {
+  id         String       @id @default(uuid()) @db.Uuid
+  ticketId   String       @map("ticket_id") @db.Uuid
+  ticket     Ticket       @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  author     TicketAuthor
+  authorName String?      @map("author_name")
+  body       String
+  createdAt  DateTime     @default(now()) @map("created_at")
+
+  @@index([ticketId, createdAt])
+  @@map("ticket_messages")
+}

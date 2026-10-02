@@ -1,0 +1,85 @@
+// Свой output: в общем node_modules/@prisma/client уже лежит клиент сервиса support.
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ConsentType {
+  OFFER
+  PERSONAL_DATA
+  MARKETING
+}
+
+/// Клиент сайта и PC-приложения. Сотрудники админки живут отдельно (schema admin).
+/// Удаление: строка остаётся с deletedAt, а email, ник, пароль и аватар затираются —
+/// ID нужен другим сервисам, чтобы подчистить свои данные.
+model User {
+  id            String    @id @default(uuid()) @db.Uuid
+  email         String    @unique
+  passwordHash  String    @map("password_hash")
+  nickname      String
+  nicknameLower String    @unique @map("nickname_lower")
+  /// Пока нет MinIO — картинка 256×256 (≤ 512 КБ) прямо в БД
+  avatar        Bytes?
+  avatarMime    String?   @map("avatar_mime")
+  avatarVersion Int       @default(0) @map("avatar_version")
+  lastLoginAt   DateTime? @map("last_login_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  deletedAt     DateTime? @map("deleted_at")
+
+  sessions      Session[]
+  consents      Consent[]
+  notifications Notification[]
+
+  @@index([createdAt])
+  @@map("users")
+}
+
+/// Сессия входа. В access-токене лежит её id: выход и удаление аккаунта отзывают токен сразу.
+model Session {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userAgent  String?   @map("user_agent") @db.VarChar(256)
+  ip         String?   @db.VarChar(64)
+  createdAt  DateTime  @default(now()) @map("created_at")
+  lastSeenAt DateTime  @default(now()) @map("last_seen_at")
+  expiresAt  DateTime  @map("expires_at")
+  revokedAt  DateTime? @map("revoked_at")
+
+  @@index([userId, createdAt])
+  @@map("sessions")
+}
+
+model Consent {
+  id        String      @id @default(uuid()) @db.Uuid
+  userId    String      @map("user_id") @db.Uuid
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      ConsentType
+  version   String
+  accepted  Boolean
+  createdAt DateTime    @default(now()) @map("created_at")
+
+  @@index([userId, type])
+  @@map("consents")
+}
+
+/// Уведомления аккаунта. Текст не храним: сайт собирает его из type + data на языке страницы.
+model Notification {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String    @db.VarChar(48)
+  data      Json      @default("{}")
+  createdAt DateTime  @default(now()) @map("created_at")
+  readAt    DateTime? @map("read_at")
+
+  @@index([userId, createdAt])
+  @@map("notifications")
+}

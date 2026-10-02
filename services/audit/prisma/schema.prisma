@@ -1,0 +1,51 @@
+// Свой output: в общем node_modules/@prisma/client уже лежит клиент сервиса support.
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Откуда пришло событие. web/pc — от клиента (trusted = false, пока нет gateway).
+enum AuditSource {
+  web
+  pc
+  admin
+  service
+}
+
+enum AuditLevel {
+  info
+  warn
+  error
+}
+
+/// Журнал важных событий: регистрации, оплаты, сессии, заявки, действия админов, сбои.
+/// Без текстов сообщений, паролей и токенов — только ID и короткие метаданные.
+model AuditEvent {
+  id        String      @id @default(uuid()) @db.Uuid
+  type      String      @db.VarChar(64)
+  source    AuditSource
+  /// Сервис-источник: web, pc, admin, support, billing…
+  service   String      @db.VarChar(32)
+  level     AuditLevel  @default(info)
+  userId    String?     @map("user_id") @db.Uuid
+  /// Кто сделал: ник пользователя или email админа (для админов — полный, это сотрудники)
+  actor     String?     @db.VarChar(128)
+  /// Объект события: ID заявки/чата, сессии, платежа
+  targetId  String?     @map("target_id") @db.VarChar(64)
+  requestId String?     @map("request_id") @db.VarChar(64)
+  ip        String?     @db.VarChar(64)
+  trusted   Boolean     @default(true)
+  meta      Json        @default("{}")
+  createdAt DateTime    @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@index([userId, createdAt])
+  @@index([type, createdAt])
+  @@index([targetId])
+  @@map("audit_events")
+}

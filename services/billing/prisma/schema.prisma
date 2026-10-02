@@ -1,0 +1,104 @@
+// Свой output: в общем node_modules/@prisma/client уже лежит клиент сервиса support.
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum SubscriptionStatus {
+  trial
+  active
+  grace
+  expired
+}
+
+enum PaymentStatus {
+  pending
+  succeeded
+  failed
+}
+
+/// Тарифы заводятся из кода при старте (PLANS в billing.service.ts).
+model Plan {
+  id            String         @id @default(uuid()) @db.Uuid
+  code          String         @unique
+  /// Календарные месяцы оплаченного периода; 0 — пробный
+  periodMonths  Int            @map("period_months")
+  /// Дни для пробного периода
+  periodDays    Int            @map("period_days")
+  priceMinor    Int            @map("price_minor")
+  currency      String         @default("RUB")
+  subscriptions Subscription[]
+
+  @@map("plans")
+}
+
+/// userId — из identity, без FK между схемами. MVP: одна подписка на пользователя.
+model Subscription {
+  id               String             @id @default(uuid()) @db.Uuid
+  userId           String             @unique @map("user_id") @db.Uuid
+  planId           String             @map("plan_id") @db.Uuid
+  plan             Plan               @relation(fields: [planId], references: [id])
+  status           SubscriptionStatus
+  trialEndsAt      DateTime?          @map("trial_ends_at")
+  currentPeriodEnd DateTime           @map("current_period_end")
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
+  payments         Payment[]
+
+  @@index([status, currentPeriodEnd])
+  @@map("subscriptions")
+}
+
+model Payment {
+  id             String        @id @default(uuid()) @db.Uuid
+  subscriptionId String        @map("subscription_id") @db.Uuid
+  subscription   Subscription  @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  planCode       String        @map("plan_code")
+  provider       String
+  /// Для mock — `mock:<idempotencyKey>`: повторный клик не спишет второй раз
+  providerRef    String        @unique @map("provider_ref")
+  status         PaymentStatus
+  amountMinor    Int           @map("amount_minor")
+  currency       String
+  raw            Json          @default("{}")
+  createdAt      DateTime      @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@map("payments")
+}
+
+model Loyalty {
+  userId         String   @id @map("user_id") @db.Uuid
+  monthsTogether Int      @default(0) @map("months_together")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@map("loyalty")
+}
+
+model UserAchievement {
+  userId     String   @map("user_id") @db.Uuid
+  /// months_1 | months_3 | months_6 | months_12 | months_24 | months_36
+  code       String
+  unlockedAt DateTime @default(now()) @map("unlocked_at")
+
+  @@id([userId, code])
+  @@map("user_achievements")
+}
+
+/// Уведомления об оплатах и ачивках. Временно здесь: сервиса уведомлений и очереди пока нет.
+model Notification {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  type      String    @db.VarChar(48)
+  data      Json      @default("{}")
+  createdAt DateTime  @default(now()) @map("created_at")
+  readAt    DateTime? @map("read_at")
+
+  @@index([userId, createdAt])
+  @@map("notifications")
+}

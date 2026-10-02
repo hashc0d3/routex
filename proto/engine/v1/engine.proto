@@ -1,0 +1,88 @@
+syntax = "proto3";
+
+package routex.engine.v1;
+
+option csharp_namespace = "RouteX.Engine.V1";
+option go_package = "github.com/routex/engine/gen/engine/v1;enginev1";
+
+// Сессия = 2..3 одновременных path. Трафик дублируется, exit дедупит по seq.
+service Engine {
+  rpc GetStatus(GetStatusRequest) returns (EngineStatus);
+  rpc ListProcesses(ListProcessesRequest) returns (ListProcessesResponse);
+  rpc StartSession(StartSessionRequest) returns (EngineStatus);
+  rpc StopSession(StopSessionRequest) returns (EngineStatus);
+  rpc StreamMetrics(StreamMetricsRequest) returns (stream MetricsSample);
+  rpc ProbeRoute(ProbeRouteRequest) returns (ProbeRouteResponse);
+}
+
+message GetStatusRequest {}
+message ListProcessesRequest {}
+message StopSessionRequest {}
+message StreamMetricsRequest {}
+
+message PathEndpoint {
+  uint32 path_index = 1;
+  string pop_id = 2;
+  string host = 3;
+  uint32 wg_port = 4;
+  string tunnel_token = 5;
+  bool is_exit = 6;
+}
+
+message StartSessionRequest {
+  string session_id = 1;
+  string process_name = 2;
+  uint32 pid = 3;
+  string region_code = 4;
+  repeated PathEndpoint paths = 5; // 2 or 3
+}
+
+message PathStatus {
+  uint32 path_index = 1;
+  string pop_id = 2;
+  bool up = 3;
+  double rtt_ms = 4;
+  double jitter_ms = 5;
+  double loss_pct = 6;
+}
+
+message EngineStatus {
+  string state = 1; // idle | connecting | active | degraded | stopping | error
+  string session_id = 2;
+  string process_name = 3;
+  uint32 pid = 4;
+  string last_error = 5;
+  uint32 paths_up = 6;
+  uint32 paths_total = 7;
+  repeated PathStatus paths = 8;
+}
+
+message ProcessInfo {
+  uint32 pid = 1;
+  string name = 2;
+}
+
+message ListProcessesResponse {
+  repeated ProcessInfo processes = 1;
+}
+
+message MetricsSample {
+  int64 unix_ms = 1;
+  double rtt_ms = 2; // после дедупа, «до сервиса»
+  double jitter_ms = 3;
+  double loss_pct = 4;
+  uint64 bytes_in = 5;
+  uint64 bytes_out = 6;
+  repeated PathStatus paths = 7;
+}
+
+message ProbeRouteRequest {
+  repeated PathEndpoint paths = 1;
+}
+
+message ProbeRouteResponse {
+  double rtt_ms = 1;
+  double jitter_ms = 2;
+  double loss_pct = 3;
+  repeated PathStatus paths = 4;
+}

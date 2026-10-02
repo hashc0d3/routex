@@ -1,0 +1,154 @@
+{
+  "uid": "routex-events",
+  "title": "RouteX — события",
+  "tags": ["routex"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": { "from": "now-24h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "source",
+        "label": "Источник",
+        "type": "custom",
+        "query": "web,pc,admin,service",
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "current": { "selected": true, "text": ["All"], "value": ["$__all"] }
+      },
+      {
+        "name": "type",
+        "label": "Событие",
+        "type": "query",
+        "datasource": { "type": "loki", "uid": "routex-loki" },
+        "query": { "label": "type", "stream": "{app=\"routex\"}", "type": 1 },
+        "definition": "label_values({app=\"routex\"}, type)",
+        "refresh": 2,
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true,
+        "current": { "selected": true, "text": ["All"], "value": ["$__all"] }
+      },
+      {
+        "name": "search",
+        "label": "Поиск (ID чата, ник, userId…)",
+        "type": "textbox",
+        "query": "",
+        "current": { "text": "", "value": "" }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Регистрации",
+      "gridPos": { "x": 0, "y": 0, "w": 4, "h": 4 },
+      "datasource": { "type": "loki", "uid": "routex-loki" },
+      "targets": [{ "refId": "A", "queryType": "instant", "expr": "sum(count_over_time({app=\"routex\", type=\"user.registered\"} [$__range]))" }],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "graphMode": "none" },
+      "fieldConfig": { "defaults": { "noValue": "0", "color": { "mode": "fixed", "fixedColor": "#5794F2" } }, "overrides": [] }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Входы",
+      "gridPos": { "x": 4, "y": 0, "w": 4, "h": 4 },
+      "datasource": { "type": "loki", "uid": "routex-loki" },
+      "targets": [{ "refId": "A", "queryType": "instant", "expr": "sum(count_over_time({app=\"routex\", type=\"auth.login\"} [$__range]))" }],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "graphMode": "none" },
+      "fieldConfig": { "defaults": { "noValue": "0", "color": { "mode": "fixed", "fixedColor": "#8AB8FF" } }, "overrides": [] }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Покупки подписки",
+      "gridPos": { "x": 8, "y": 0, "w": 4, "h": 4 },
+      "datasource": { "type": "loki", "uid": "routex-loki" },
+      "targets": [{ "refId": "A", "queryType": "instant", "expr": "sum(count_over_time({app=\"routex\", type=~\"subscription\\\\..*\"} [$__range]))" }],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "graphMode": "none" },
+      "fieldConfig": { "defaults": { "noValue": "0", "color": { "mode": "fixed", "fixedColor": "#73BF69" } }, "overrides": [] }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Новые заявки",
+      "gridPos": { "x": 12, "y": 0, "w": 4, "h": 4 },
+      "datasource": { "type": "loki", "uid": "routex-loki" },
+      "targets": [{ "refId": "A", "queryType": "instant", "expr": "sum(count_over_time({app=\"routex\", type=\"ticket.created\"} [$__range]))" }],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "graphMode": "none" },
+      "fieldConfig": { "defaults": { "noValue": "0", "color": { "mode": "fixed", "fixedColor": "#FADE2A" } }, "overrides": [] }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Сообщения в чатах",
+      "gridPos": { "x": 16, "y": 0, "w": 4, "h": 4 },
+      "datasource": { "type": "loki", "uid": "routex-loki" },
+      "targets": [{ "refId": "A", "queryType": "instant", "expr": "sum(count_over_time({app=\"routex\", type=\"ticket.message\"} [$__range]))" }],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "graphMode": "none" },
+      "fieldConfig": { "defaults": { "noValue": "0", "color": { "mode": "fixed", "fixedColor": "#FF9830" } }, "overrides": [] }
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Ошибки",
+      "gridPos": { "x": 20, "y": 0, "w": 4, "h": 4 },
+      "datasource": { "type": "loki", "uid": "routex-loki" },
+      "targets": [{ "refId": "A", "queryType": "instant", "expr": "sum(count_over_time({app=\"routex\", kind=\"event\", level=\"error\"} [$__range]))" }],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "none" },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "0",
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "#1F60C4", "value": null }, { "color": "#E02F44", "value": 1 }] }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "События по типам",
+      "gridPos": { "x": 0, "y": 4, "w": 24, "h": 8 },
+      "datasource": { "type": "loki", "uid": "routex-loki" },
+      "targets": [
+        {
+          "refId": "A",
+          "queryType": "range",
+          "legendFormat": "{{type}}",
+          "expr": "sum by (type) (count_over_time({app=\"routex\", kind=\"event\", source=~\"$source\", type=~\"$type\"} [$__interval]))"
+        }
+      ],
+      "options": { "legend": { "displayMode": "list", "placement": "right" }, "tooltip": { "mode": "multi" } },
+      "fieldConfig": { "defaults": { "custom": { "drawStyle": "bars", "fillOpacity": 70, "stacking": { "mode": "normal" } } }, "overrides": [] }
+    },
+    {
+      "id": 8,
+      "type": "logs",
+      "title": "Лента событий (сайт, PC, админка, сервисы)",
+      "gridPos": { "x": 0, "y": 12, "w": 24, "h": 14 },
+      "datasource": { "type": "loki", "uid": "routex-loki" },
+      "targets": [
+        {
+          "refId": "A",
+          "queryType": "range",
+          "expr": "{app=\"routex\", source=~\"$source\", type=~\"$type\"} |~ \"(?i)$search\""
+        }
+      ],
+      "options": { "showTime": true, "showLabels": true, "wrapLogMessage": true, "sortOrder": "Descending", "enableLogDetails": true, "prettifyLogMessage": false, "dedupStrategy": "none" }
+    },
+    {
+      "id": 9,
+      "type": "logs",
+      "title": "Ошибки и предупреждения",
+      "gridPos": { "x": 0, "y": 26, "w": 24, "h": 10 },
+      "datasource": { "type": "loki", "uid": "routex-loki" },
+      "targets": [{ "refId": "A", "queryType": "range", "expr": "{app=\"routex\", level=~\"warn|error\"}" }],
+      "options": { "showTime": true, "showLabels": true, "wrapLogMessage": true, "sortOrder": "Descending", "enableLogDetails": true, "dedupStrategy": "none" }
+    }
+  ]
+}

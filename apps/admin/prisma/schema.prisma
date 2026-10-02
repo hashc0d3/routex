@@ -1,0 +1,36 @@
+// Своя схема и свой output: админка не зависит от БД других сервисов,
+// а в общем node_modules/@prisma/client лежит клиент support.
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum StaffRole {
+  super_admin
+  admin
+  operator
+}
+
+/// Сотрудник с доступом в админку. Права роли — в src/lib/rbac.ts.
+model StaffUser {
+  id             String    @id @default(uuid()) @db.Uuid
+  email          String    @unique
+  name           String
+  role           StaffRole
+  /// scrypt:<salt>:<hash>
+  passwordHash   String    @map("password_hash")
+  active         Boolean   @default(true)
+  /// Увеличение разлогинивает сотрудника на всех устройствах (блокировка, сброс пароля, смена роли).
+  sessionVersion Int       @default(1) @map("session_version")
+  lastLoginAt    DateTime? @map("last_login_at")
+  createdById    String?   @map("created_by_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  @@map("staff_users")
+}

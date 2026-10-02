@@ -1,0 +1,17 @@
+{
+  "name": "routex",
+  "private": true,
+  "workspaces": ["apps/*", "services/*"],
+  "scripts": {
+    "dev:web": "npm run dev -w @routex/web",
+    "dev:admin": "npm run dev -w @routex/admin",
+    "dev:support": "npm run dev -w @routex/support",
+    "dev:identity": "npm run dev -w @routex/identity",
+    "dev:billing": "npm run dev -w @routex/billing",
+    "dev:audit": "npm run dev -w @routex/audit",
+    "obs:start": "powershell -ExecutionPolicy Bypass -File deploy/observability/start-local.ps1",
+    "obs:stop": "powershell -ExecutionPolicy Bypass -File deploy/observability/start-local.ps1 -Stop",
+    "db:up": "docker compose up -d postgres",
+    "build:web": "npm run build -w @routex/web"
+  }
+}
