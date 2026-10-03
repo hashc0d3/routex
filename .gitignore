@@ -8,3 +8,7 @@ generated
 .env.local
 *.log
 .DS_Store
+clients/windows/**/bin
+clients/windows/**/obj
+clients/windows/artifacts
+*.user

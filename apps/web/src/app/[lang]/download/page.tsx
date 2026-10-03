@@ -15,7 +15,14 @@ export default async function DownloadPage({ params }: { params: Promise<{ lang:
           <li key={s}>{s}</li>
         ))}
       </ol>
-      <p className="mt-8 inline-block bg-white/10 px-5 py-3 text-sm text-white/50">{t.soon}</p>
+      <a
+        href="/downloads/RouteX-win-x64.zip"
+        className="rx-cut mt-8 inline-flex items-center gap-3 bg-rx-red px-6 py-3.5 text-sm font-semibold uppercase tracking-wider text-white transition hover:bg-rx-red2"
+      >
+        {t.windows}
+        <span className="text-xs font-normal normal-case tracking-normal text-white/70">{t.windowsMeta}</span>
+      </a>
+      <p className="mt-3 text-xs text-white/40">{t.note}</p>
       <p className="mt-6 text-sm text-white/50">
         {t.noAccount}{" "}
         <Link href={localizePath("/register", locale)} className="text-white">

@@ -9,5 +9,6 @@
 **/*.tsbuildinfo
 .git
 .cursor
+clients
 deploy/.env
 deploy/observability/.env.local
