@@ -26,6 +26,14 @@ type Row = {
   user: User;
   subscription: Subscription;
   paidMonths: number;
+  /** Реферальный код этого пользователя. */
+  refCode: string;
+  /** Чей код использован при регистрации. */
+  referredBy: string | null;
+  /** Приглашённый уже оплатил — бонус пригласившему начислен. */
+  referralPaid: boolean;
+  /** Бонусы на счету. */
+  bonus: number;
   unlocked: UnlockedAchievement[];
   notifications: AppNotification[];
   activeSession: ActiveSession | null;
@@ -58,6 +66,10 @@ function normalize(row: Row): Row {
       createdAt: row.user.createdAt,
     },
     paidMonths: row.paidMonths ?? (row.subscription.status === "active" ? 1 : 0),
+    refCode: row.refCode ?? row.user.id.replace(/-/g, "").slice(0, 8),
+    referredBy: row.referredBy ?? null,
+    referralPaid: row.referralPaid ?? false,
+    bonus: row.bonus ?? 0,
     unlocked: row.unlocked ?? [],
     notifications: row.notifications ?? [],
     activeSession: row.activeSession ?? null,
@@ -128,11 +140,25 @@ function syncAchievements(row: Row) {
   }
 }
 
-function toMe(row: Row): Me {
+const BONUS_PER_FRIEND = 300;
+
+function referralOf(db: Db, row: Row) {
+  const friends = Object.values(db.users).filter((u) => u.referredBy === row.refCode);
+  return {
+    code: row.refCode,
+    invited: friends.length,
+    paid: friends.filter((u) => u.referralPaid).length,
+    balance: row.bonus,
+    claimable: row.bonus >= BONUS_PER_FRIEND,
+  };
+}
+
+function toMe(db: Db, row: Row): Me {
   return {
     user: row.user,
     subscription: row.subscription,
     loyalty: { monthsTogether: row.paidMonths, unlocked: row.unlocked },
+    referral: referralOf(db, row),
   };
 }
 
@@ -204,6 +230,10 @@ export const mockApi: Api = {
       },
       subscription: trialSub(),
       paidMonths: 0,
+      refCode: uuid().replace(/-/g, "").slice(0, 8),
+      referredBy: payload.refCode?.trim().toLowerCase() || null,
+      referralPaid: false,
+      bonus: 0,
       unlocked: [],
       notifications: [],
       activeSession: null,
@@ -222,11 +252,14 @@ export const mockApi: Api = {
   async logout() {
     return;
   },
+  async sessionAlive(token) {
+    rowFor(load(), token);
+  },
   async me(token) {
     const db = load();
     const row = rowFor(db, token);
     save(db);
-    return toMe(row);
+    return toMe(db, row);
   },
   async updateProfile(token, patch) {
     const db = load();
@@ -266,8 +299,32 @@ export const mockApi: Api = {
     });
     row.paidMonths += year ? 12 : 1;
     syncAchievements(row);
+    // первая оплата приглашённого — 300 бонусов тому, кто дал ссылку
+    if (row.referredBy && !row.referralPaid) {
+      row.referralPaid = true;
+      const inviter = Object.values(db.users).find((u) => u.refCode === row.referredBy);
+      if (inviter) {
+        inviter.bonus += BONUS_PER_FRIEND;
+        notify(inviter, "referral_bonus", { bonus: BONUS_PER_FRIEND, balance: inviter.bonus });
+      }
+    }
     save(db);
     return row.subscription;
+  },
+  async claimReferral() {
+    return;
+  },
+  async claimBonus(token) {
+    const db = load();
+    const row = rowFor(db, token);
+    if (row.bonus < BONUS_PER_FRIEND) throw new ApiError("bonus_empty");
+    row.bonus -= BONUS_PER_FRIEND;
+    const base = new Date(row.subscription.currentPeriodEnd) > new Date() ? new Date(row.subscription.currentPeriodEnd) : new Date();
+    base.setDate(base.getDate() + 10);
+    row.subscription = { ...row.subscription, status: "active", trialEndsAt: null, currentPeriodEnd: base.toISOString() };
+    notify(row, "bonus_spent", { days: 10, until: row.subscription.currentPeriodEnd });
+    save(db);
+    return { subscription: row.subscription, loyalty: { monthsTogether: row.paidMonths, unlocked: row.unlocked }, referral: referralOf(db, row) };
   },
   async listFaq(locale) {
     return FAQ[locale] ?? FAQ.ru;

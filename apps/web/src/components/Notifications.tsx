@@ -67,6 +67,10 @@ function describe(n: AppNotification, d: Dictionary) {
         title: t.ticket_status.title,
         body: t.ticket_status.body(num(n.data.number), d.tickets.status[String(n.data.status)] ?? String(n.data.status)),
       };
+    case "referral_bonus":
+      return { title: t.referral_bonus.title, body: t.referral_bonus.body(num(n.data.bonus), num(n.data.balance)) };
+    case "bonus_spent":
+      return { title: t.bonus_spent.title, body: t.bonus_spent.body(num(n.data.days), date(n.data.until)) };
   }
 }
 

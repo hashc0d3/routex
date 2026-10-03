@@ -90,6 +90,40 @@ model UserAchievement {
   @@map("user_achievements")
 }
 
+/// Код приглашения. Один на пользователя, живёт вечно.
+model ReferralCode {
+  id            String                 @id @default(uuid()) @db.Uuid
+  userId        String                 @unique @map("user_id") @db.Uuid
+  code          String                 @unique @db.VarChar(16)
+  createdAt     DateTime               @default(now()) @map("created_at")
+  attributions  ReferralAttribution[]
+
+  @@map("referral_codes")
+}
+
+/// Кто по чьей ссылке зарегистрировался. Бонус начисляется один раз — на первой оплате приглашённого.
+model ReferralAttribution {
+  id             String       @id @default(uuid()) @db.Uuid
+  codeId         String       @map("code_id") @db.Uuid
+  code           ReferralCode @relation(fields: [codeId], references: [id])
+  referredUserId String       @unique @map("referred_user_id") @db.Uuid
+  /// Заполняется, когда приглашённый впервые оплатил подписку
+  paidAt         DateTime?    @map("paid_at")
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  @@index([codeId])
+  @@map("referral_attributions")
+}
+
+/// Бонусный счёт пригласившего: 300 бонусов за каждого оплатившего друга.
+model BonusAccount {
+  userId    String   @id @map("user_id") @db.Uuid
+  balance   Int      @default(0)
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("bonus_accounts")
+}
+
 /// Уведомления об оплатах и ачивках. Временно здесь: сервиса уведомлений и очереди пока нет.
 model Notification {
   id        String    @id @default(uuid()) @db.Uuid

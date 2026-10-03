@@ -61,6 +61,7 @@ function RegisterForm() {
     try {
       const nickError = nicknameError(nickname);
       if (nickError) throw new ApiError(nickError);
+      const refCode = params.get("ref") ?? undefined;
       const res = await clientApi.register({
         nickname,
         email,
@@ -68,7 +69,10 @@ function RegisterForm() {
         consentOffer,
         consentPersonalData,
         consentMarketing,
+        refCode,
       });
+      // боевой сервер привязывает приглашение отдельным запросом, mock запоминает код при регистрации
+      await clientApi.claimReferral(res.accessToken, refCode ?? "").catch(() => undefined);
       if (plan === "pro" || plan === "year") {
         await clientApi.mockPay(res.accessToken, plan === "year" ? "pro_year" : "pro_month");
       }

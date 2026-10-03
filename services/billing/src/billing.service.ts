@@ -2,6 +2,9 @@ import { Injectable, OnModuleInit } from "@nestjs/common";
 import { audit } from "./audit";
 import type { MockPayDto } from "./dto";
 import { PrismaService } from "./prisma.service";
+import type { Prisma } from "../generated/client";
+
+type PrismaTx = Prisma.TransactionClient;
 
 const PLANS = [
   { code: "trial_3d", periodMonths: 0, periodDays: 3, priceMinor: 0 },
@@ -20,6 +23,12 @@ const ACHIEVEMENTS = [
 ];
 
 const MAX_NOTIFICATIONS = 50;
+
+/** Бонусы пригласившему за первую оплату каждого друга. */
+const REFERRAL_BONUS = 300;
+/** Сколько бонусов стоит 10 дней подписки. */
+const BONUS_DAYS_COST = 300;
+const BONUS_DAYS = 10;
 
 type SubRow = {
   status: "trial" | "active" | "grace" | "expired";
@@ -69,10 +78,11 @@ export class BillingService implements OnModuleInit {
   }
 
   async me(userId: string) {
-    const [sub, loyalty, unlocked] = await Promise.all([
+    const [sub, loyalty, unlocked, referral] = await Promise.all([
       this.subscriptionOf(userId),
       this.prisma.loyalty.findUnique({ where: { userId } }),
       this.prisma.userAchievement.findMany({ where: { userId }, orderBy: { unlockedAt: "asc" } }),
+      this.referralOf(userId),
     ]);
     return {
       subscription: subscriptionView(sub),
@@ -80,7 +90,116 @@ export class BillingService implements OnModuleInit {
         monthsTogether: loyalty?.monthsTogether ?? 0,
         unlocked: unlocked.map((a) => ({ code: a.code, unlockedAt: a.unlockedAt.toISOString() })),
       },
+      referral,
     };
+  }
+
+  // ——— реферальная программа ———
+
+  /** Код приглашения пользователя: создаётся при первом обращении и больше не меняется. */
+  private async codeOf(userId: string) {
+    const found = await this.prisma.referralCode.findUnique({ where: { userId } });
+    if (found) return found;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const code = crypto.randomUUID().replace(/-/g, "").slice(0, 8);
+      try {
+        return await this.prisma.referralCode.create({ data: { userId, code } });
+      } catch (err) {
+        // тот же пользователь уже получил код в параллельном запросе — берём его
+        const raced = await this.prisma.referralCode.findUnique({ where: { userId } });
+        if (raced) return raced;
+        if (attempt === 4) throw err;
+      }
+    }
+    throw new Error("referral code");
+  }
+
+  private async referralOf(userId: string) {
+    const [own, account] = await Promise.all([this.codeOf(userId), this.prisma.bonusAccount.findUnique({ where: { userId } })]);
+    const [invited, paid] = await Promise.all([
+      this.prisma.referralAttribution.count({ where: { codeId: own.id } }),
+      this.prisma.referralAttribution.count({ where: { codeId: own.id, paidAt: { not: null } } }),
+    ]);
+    const balance = account?.balance ?? 0;
+    return {
+      code: own.code,
+      invited,
+      paid,
+      balance,
+      /** Непогашенный бонус: каждый оплативший друг даёт один, пока его не потратили. */
+      claimable: balance >= BONUS_DAYS_COST,
+    };
+  }
+
+  /** Регистрация по ссылке. Чужой или свой код молча игнорируется, повторно привязать нельзя. */
+  async attributeReferral(userId: string, rawCode: string) {
+    const code = rawCode.trim().toLowerCase();
+    if (!/^[a-z0-9]{4,16}$/.test(code)) return;
+    const own = await this.prisma.referralCode.findUnique({ where: { code } });
+    if (!own || own.userId === userId) return;
+    await this.prisma.referralAttribution.createMany({
+      data: [{ codeId: own.id, referredUserId: userId }],
+      skipDuplicates: true,
+    });
+  }
+
+  /**
+   * Первая успешная оплата приглашённого: пригласившему +300 бонусов, один раз.
+   * Возвращает получателя бонуса, если начисление случилось.
+   */
+  private async rewardReferrer(tx: PrismaTx, referredUserId: string, planCode: string) {
+    const attribution = await tx.referralAttribution.findUnique({ where: { referredUserId } });
+    if (!attribution || attribution.paidAt) return null;
+    const claimed = await tx.referralAttribution.updateMany({
+      where: { id: attribution.id, paidAt: null },
+      data: { paidAt: new Date() },
+    });
+    if (claimed.count === 0) return null;
+
+    const owner = await tx.referralCode.findUniqueOrThrow({ where: { id: attribution.codeId }, select: { userId: true } });
+    const account = await tx.bonusAccount.upsert({
+      where: { userId: owner.userId },
+      create: { userId: owner.userId, balance: REFERRAL_BONUS },
+      update: { balance: { increment: REFERRAL_BONUS } },
+    });
+    await tx.notification.create({
+      data: {
+        userId: owner.userId,
+        type: "referral_bonus",
+        data: { bonus: REFERRAL_BONUS, balance: account.balance, plan: planCode },
+      },
+    });
+    return { userId: owner.userId, balance: account.balance };
+  }
+
+  /** Потратить бонус: 300 бонусов превращаются в 10 дней, которые добавляются к текущему сроку. */
+  async claimBonus(userId: string) {
+    const sub = await this.subscriptionOf(userId);
+    const done = await this.prisma.$transaction(async (tx) => {
+      const spent = await tx.bonusAccount.updateMany({
+        where: { userId, balance: { gte: BONUS_DAYS_COST } },
+        data: { balance: { decrement: BONUS_DAYS_COST } },
+      });
+      if (spent.count === 0) return null;
+
+      const current = await tx.subscription.findUniqueOrThrow({ where: { id: sub.id } });
+      const base = current.currentPeriodEnd > new Date() ? current.currentPeriodEnd : new Date();
+      const end = new Date(base.getTime() + BONUS_DAYS * 86_400_000);
+      await tx.subscription.update({
+        where: { id: sub.id },
+        data: { status: "active", trialEndsAt: null, currentPeriodEnd: end },
+      });
+      await tx.notification.create({
+        data: { userId, type: "bonus_spent", data: { days: BONUS_DAYS, until: end.toISOString() } },
+      });
+      return end;
+    });
+    if (!done) {
+      const { BadRequestException } = await import("@nestjs/common");
+      throw new BadRequestException({ code: "bonus_empty" });
+    }
+    audit({ type: "referral.bonus_spent", userId, meta: { days: BONUS_DAYS, until: done.toISOString() } });
+    return this.me(userId);
   }
 
   async mockPay(userId: string, dto: MockPayDto) {
@@ -135,7 +254,9 @@ export class BillingService implements OnModuleInit {
           ...fresh.map((a) => ({ userId, type: "achievement_unlocked", data: { code: a.code } })),
         ],
       });
-      return { renewing, end, paymentId: payment.id, months: loyalty.monthsTogether, unlocked: fresh.map((a) => a.code) };
+      // первая оплата приглашённого приносит бонус тому, кто его позвал
+      const referrer = await this.rewardReferrer(tx, userId, dto.planCode);
+      return { renewing, end, paymentId: payment.id, months: loyalty.monthsTogether, unlocked: fresh.map((a) => a.code), referrer };
     });
 
     if (done) {
@@ -153,6 +274,14 @@ export class BillingService implements OnModuleInit {
           ...(done.unlocked.length ? { achievements: done.unlocked.join(",") } : {}),
         },
       });
+      if (done.referrer) {
+        audit({
+          type: "referral.bonus_granted",
+          userId: done.referrer.userId,
+          actor: userId,
+          meta: { bonus: REFERRAL_BONUS, balance: done.referrer.balance, plan: dto.planCode },
+        });
+      }
     }
 
     const fresh = await this.prisma.subscription.findUniqueOrThrow({ where: { id: sub.id }, include: SUB_INCLUDE });
@@ -188,6 +317,8 @@ export class BillingService implements OnModuleInit {
       this.prisma.notification.deleteMany({ where: { userId } }),
       this.prisma.userAchievement.deleteMany({ where: { userId } }),
       this.prisma.loyalty.deleteMany({ where: { userId } }),
+      this.prisma.bonusAccount.deleteMany({ where: { userId } }),
+      this.prisma.referralAttribution.deleteMany({ where: { referredUserId: userId } }),
       this.prisma.subscription.deleteMany({ where: { userId } }),
     ]);
   }

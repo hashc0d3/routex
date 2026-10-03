@@ -11,6 +11,14 @@ export class MockPayDto {
   idempotencyKey?: string;
 }
 
+export class ReferralClaimDto {
+  /** Код из ссылки пригласившего. Пустой — регистрация без приглашения. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(16)
+  code?: string;
+}
+
 export class LookupDto {
   @IsArray()
   @ArrayMaxSize(200)

@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, ForbiddenException, Get, HttpCode, Param, ParseUUIDPipe, Post, UseGuards } from "@nestjs/common";
 import { Throttle, ThrottlerGuard } from "@nestjs/throttler";
 import { BillingService } from "./billing.service";
-import { LookupDto, MockPayDto } from "./dto";
+import { LookupDto, MockPayDto, ReferralClaimDto } from "./dto";
 import { AdminTokenGuard, UserGuard, UserId } from "./guards";
 
 @Controller("v1/billing")
@@ -21,6 +21,20 @@ export class BillingController {
   pay(@UserId() userId: string, @Body() dto: MockPayDto) {
     if ((process.env.PROVIDER ?? "mock") !== "mock") throw new ForbiddenException({ code: "mock_disabled" });
     return this.billing.mockPay(userId, dto);
+  }
+
+  /** Регистрация прошла по реферальной ссылке: запоминаем, кто пригласил. Бонус придёт после первой оплаты. */
+  @Post("me/referral")
+  @HttpCode(204)
+  referral(@UserId() userId: string, @Body() dto: ReferralClaimDto) {
+    if (dto.code) return this.billing.attributeReferral(userId, dto.code);
+  }
+
+  /** 300 бонусов → 10 дней подписки, добавленных к текущему сроку. */
+  @Post("me/bonus/claim")
+  @HttpCode(200)
+  claim(@UserId() userId: string) {
+    return this.billing.claimBonus(userId);
   }
 
   @Get("me/notifications")

@@ -43,7 +43,7 @@ export default function AccountPage() {
   const router = useRouter();
   const { d, href, errorText } = useLocale();
   const t = d.account;
-  const { ready, user, subscription, loyalty, refresh, setUser, logout } = useSession();
+  const { ready, user, subscription, loyalty, referral, refresh, setUser, logout } = useSession();
   const notifications = useNotifications();
   const [message, setMessage] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -64,6 +64,10 @@ export default function AccountPage() {
   const [confirm, setConfirm] = useState<PaidPlan | null>(null);
   const [confirmErr, setConfirmErr] = useState<string | null>(null);
   const [paidNote, setPaidNote] = useState<string | null>(null);
+  const [bonusOpen, setBonusOpen] = useState(false);
+  const [bonusChoice, setBonusChoice] = useState<"days" | "keep">("days");
+  const [bonusErr, setBonusErr] = useState<string | null>(null);
+  const [bonusNote, setBonusNote] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteErr, setDeleteErr] = useState<string | null>(null);
   const closeDelete = useCallback(() => setDeleting(false), []);
@@ -71,9 +75,9 @@ export default function AccountPage() {
   const closeConfirm = useCallback(() => setConfirm(null), []);
 
   const refLink = useMemo(() => {
-    if (!user || typeof window === "undefined") return "";
-    return `${window.location.origin}${href("/register")}?ref=${user.id.slice(0, 8)}`;
-  }, [user, href]);
+    if (!user || !referral || typeof window === "undefined") return "";
+    return `${window.location.origin}${href("/register")}?ref=${referral.code}`;
+  }, [user, referral, href]);
 
   useEffect(() => {
     if (ready && !user && !leavingRef.current) router.replace(href("/login"));
@@ -99,7 +103,7 @@ export default function AccountPage() {
     knownCodes.current = codes;
   }, [loyalty, d, t]);
 
-  if (!ready || !user || !subscription || !loyalty) {
+  if (!ready || !user || !subscription || !loyalty || !referral) {
     return <AccountSkeleton label={d.common.loading} />;
   }
 
@@ -145,6 +149,19 @@ export default function AccountPage() {
     setPaidNote(null);
     setConfirmErr(null);
     setConfirm(planCode);
+  }
+
+  function applyBonus() {
+    if (bonusChoice === "keep") {
+      setBonusOpen(false);
+      return;
+    }
+    void run(async () => {
+      await withToken((tk) => clientApi.claimBonus(tk));
+      await refresh();
+      setBonusOpen(false);
+      setBonusNote(t.bonusApplied);
+    }, setBonusErr);
   }
 
   function confirmPay(planCode: PaidPlan) {
@@ -403,18 +420,86 @@ export default function AccountPage() {
         </section>
 
         <section className="border border-white/10 p-6">
-          <h2 className="text-xs uppercase tracking-wider text-white/40">{t.referral}</h2>
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-xs uppercase tracking-wider text-white/40">{t.referral}</h2>
+            <span className="font-display text-sm tracking-wide text-white">{t.referralBalance(referral.balance)}</span>
+          </div>
           <p className="mt-2 break-all text-sm text-white/80">{refLink}</p>
-          <button
-            type="button"
-            className={`mt-3 ${chip} ${copied ? "border border-emerald-400/50 bg-emerald-400/10 text-emerald-300" : chipGhost}`}
-            onClick={() => {
-              void copyText(refLink).then(setCopied);
-            }}
-          >
-            {copied ? t.copied : t.copy}
-          </button>
-          <p className="mt-3 text-sm text-white/45">{t.referralNote}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              className={`${chip} ${copied ? "border border-emerald-400/50 bg-emerald-400/10 text-emerald-300" : chipGhost}`}
+              onClick={() => {
+                void copyText(refLink).then(setCopied);
+              }}
+            >
+              {copied ? t.copied : t.copy}
+            </button>
+            <button
+              type="button"
+              disabled={!referral.claimable || pending}
+              className={`${chip} ${chipPrimary}`}
+              onClick={() => {
+                setBonusErr(null);
+                setBonusChoice("days");
+                setBonusOpen(true);
+              }}
+            >
+              {referral.claimable ? t.claimBonus : t.bonusEmpty}
+            </button>
+          </div>
+          <p className="mt-3 text-xs text-white/40">
+            {t.referralInvited(referral.invited)} · {t.referralPaid(referral.paid)}
+          </p>
+          <p className="mt-1.5 text-sm text-white/45">{t.referralNote}</p>
+
+          {bonusOpen ? (
+            <div className="mt-4 border border-white/10 bg-black/40 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-rx-red2">{t.bonusTitle}</p>
+              <div className="mt-3 space-y-2">
+                <label className={`flex cursor-pointer gap-3 border p-3 text-sm ${bonusChoice === "days" ? "border-rx-red/60 bg-rx-red/10" : "border-white/10"}`}>
+                  <input
+                    type="radio"
+                    name="bonus"
+                    className="mt-1 accent-rx-red"
+                    checked={bonusChoice === "days"}
+                    onChange={() => setBonusChoice("days")}
+                  />
+                  <span>
+                    <span className="block font-semibold text-white">{t.bonusDays}</span>
+                    <span className="text-xs text-white/50">{t.bonusDaysHint}</span>
+                  </span>
+                </label>
+                <label className={`flex cursor-pointer gap-3 border p-3 text-sm ${bonusChoice === "keep" ? "border-rx-red/60 bg-rx-red/10" : "border-white/10"}`}>
+                  <input
+                    type="radio"
+                    name="bonus"
+                    className="mt-1 accent-rx-red"
+                    checked={bonusChoice === "keep"}
+                    onChange={() => setBonusChoice("keep")}
+                  />
+                  <span>
+                    <span className="block font-semibold text-white">{t.bonusPoints}</span>
+                    <span className="text-xs text-white/50">{t.bonusPointsHint}</span>
+                  </span>
+                </label>
+              </div>
+              {bonusErr ? <p className="mt-3 text-sm text-rx-red2">{bonusErr}</p> : null}
+              <div className="mt-4 flex gap-2">
+                <button type="button" disabled={pending} onClick={applyBonus} className={`${chip} ${chipSolid}`}>
+                  {t.bonusApply}
+                </button>
+                <button type="button" onClick={() => setBonusOpen(false)} className={`${chip} ${chipGhost}`}>
+                  {d.common.cancel}
+                </button>
+              </div>
+            </div>
+          ) : null}
+          {bonusNote ? (
+            <p role="status" className="mt-3 text-sm text-emerald-300">
+              {bonusNote}
+            </p>
+          ) : null}
         </section>
       </div>
 

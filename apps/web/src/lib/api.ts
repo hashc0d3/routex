@@ -86,6 +86,7 @@ const liveApi: Api = {
     if (token) await request(`${apiBase()}/v1/auth/logout`, { method: "POST", token }).catch(() => undefined);
   },
   me: (token) => request(`${apiBase()}/v1/me`, { token }),
+  sessionAlive: (token) => request(`${apiBase()}/v1/me`, { token }),
   updateProfile: (token, patch) => request(`${apiBase()}/v1/me/profile`, { method: "PATCH", token, json: patch }),
   setAvatar(token, image) {
     if (!image) return request(`${apiBase()}/v1/me/avatar`, { method: "DELETE", token });
@@ -95,6 +96,9 @@ const liveApi: Api = {
   },
   mockPay: (token, planCode) =>
     request(`${apiBase()}/v1/billing/mock/pay`, { method: "POST", token, json: { planCode } }),
+  claimReferral: (token, code) =>
+    request(`${apiBase()}/v1/billing/me/referral`, { method: "POST", token, json: { code } }),
+  claimBonus: (token) => request(`${apiBase()}/v1/billing/me/bonus/claim`, { method: "POST", token }),
   listFaq: (locale) => request(`${apiBase()}/v1/support/faq?locale=${encodeURIComponent(locale)}`),
   listNotifications: (token) => request(`${apiBase()}/v1/me/notifications`, { token }),
   markNotificationsRead: (token) => request(`${apiBase()}/v1/me/notifications/read`, { method: "POST", token }),
@@ -219,10 +223,12 @@ const servicesApi: Api = {
   async me(token) {
     const [{ user }, billing] = await Promise.all([
       request<{ user: User }>(`${identityBase()}/v1/me`, { token }),
-      request<Pick<Me, "subscription" | "loyalty">>(`${billingBase()}/v1/billing/me`, { token }),
+      request<Pick<Me, "subscription" | "loyalty" | "referral">>(`${billingBase()}/v1/billing/me`, { token }),
     ]);
     return { user, ...billing };
   },
+  // один запрос в identity: отозванная сессия видна сразу, без опроса billing и support
+  sessionAlive: (token) => request(`${identityBase()}/v1/me`, { token }),
   updateProfile: (token, patch) =>
     request(`${identityBase()}/v1/me/profile`, { method: "PATCH", token, json: patch }),
   setAvatar(token, image) {
@@ -237,6 +243,11 @@ const servicesApi: Api = {
       token,
       json: { planCode, idempotencyKey: uuid() },
     }),
+  claimReferral: async (token, code) => {
+    if (!code.trim()) return;
+    await request(`${billingBase()}/v1/billing/me/referral`, { method: "POST", token, json: { code: code.trim() } });
+  },
+  claimBonus: (token) => request(`${billingBase()}/v1/billing/me/bonus/claim`, { method: "POST", token }),
   listFaq: (locale) => mockApi.listFaq(locale),
   async createTicket(token, payload) {
     let user: Pick<User, "id" | "nickname" | "email"> | undefined;

@@ -18,7 +18,8 @@ export type ErrorCode =
   | "ticket_contact_required"
   | "ticket_phone_invalid"
   | "ticket_not_found"
-  | "support_offline";
+  | "support_offline"
+  | "bonus_empty";
 
 /** Ошибки API приходят кодом; текст подставляет UI на языке страницы. */
 export class ApiError extends Error {
@@ -58,10 +59,24 @@ export type Loyalty = {
   unlocked: UnlockedAchievement[];
 };
 
+export type Referral = {
+  /** Код для ссылки вида /register?ref=… */
+  code: string;
+  /** Сколько человек зарегистрировалось по ссылке. */
+  invited: number;
+  /** Сколько из них оплатили подписку. */
+  paid: number;
+  /** Бонусы на счету. 300 = 10 дней подписки. */
+  balance: number;
+  /** Хватает ли бонусов, чтобы забрать 10 дней. */
+  claimable: boolean;
+};
+
 export type Me = {
   user: User;
   subscription: Subscription;
   loyalty: Loyalty;
+  referral: Referral;
 };
 
 export type FaqArticle = {
@@ -121,6 +136,8 @@ export type RegisterPayload = {
   consentOffer: boolean;
   consentPersonalData: boolean;
   consentMarketing: boolean;
+  /** Реферальный код из ссылки, по которой пришёл человек. */
+  refCode?: string;
 };
 
 export type NotificationType =
@@ -131,7 +148,9 @@ export type NotificationType =
   | "session_started"
   | "session_ended"
   | "ticket_reply"
-  | "ticket_status";
+  | "ticket_status"
+  | "referral_bonus"
+  | "bonus_spent";
 
 /** Текст не хранится: UI собирает его из type + data на языке страницы. */
 export type AppNotification = {
@@ -149,9 +168,15 @@ export type Api = {
   login(email: string, password: string): Promise<AuthResult>;
   logout(): Promise<void>;
   me(token: string): Promise<Me>;
+  /** Лёгкая проверка, что сессию не отозвали. Кидает session_invalid, остальное — наружу. */
+  sessionAlive(token: string): Promise<void>;
   updateProfile(token: string, patch: { nickname: string }): Promise<User>;
   setAvatar(token: string, image: Blob | null): Promise<User>;
   mockPay(token: string, planCode: string): Promise<Subscription>;
+  /** Привязать регистрацию к реферальному коду из ссылки. Пустой код — ничего не делать. */
+  claimReferral(token: string, code: string): Promise<void>;
+  /** Потратить 300 бонусов на 10 дней подписки. */
+  claimBonus(token: string): Promise<Pick<Me, "subscription" | "loyalty" | "referral">>;
   listFaq(locale: string): Promise<FaqArticle[]>;
   createTicket(token: string | null, payload: TicketPayload): Promise<{ id: string; number: number }>;
   listMyTickets(token: string): Promise<MyTicket[]>;
