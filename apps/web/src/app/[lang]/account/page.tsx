@@ -19,6 +19,7 @@ import {
 } from "@/components/icons";
 import { DeleteAccountDialog } from "@/components/DeleteAccountDialog";
 import { MyTickets } from "@/components/MyTickets";
+import { PaymentHistory } from "@/components/PaymentHistory";
 import { type PaidPlan, PurchaseConfirm } from "@/components/PurchaseConfirm";
 import { AccountSkeleton } from "@/components/Skeleton";
 import { achievementState, NICKNAME_MAX, nicknameError } from "@/lib/achievements";
@@ -43,7 +44,7 @@ export default function AccountPage() {
   const router = useRouter();
   const { d, href, errorText } = useLocale();
   const t = d.account;
-  const { ready, user, subscription, loyalty, referral, refresh, setUser, logout } = useSession();
+  const { ready, user, subscription, loyalty, referral, payments, refresh, setUser, logout } = useSession();
   const notifications = useNotifications();
   const [message, setMessage] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -417,6 +418,8 @@ export default function AccountPage() {
               {paidNote}
             </p>
           ) : null}
+
+          <PaymentHistory payments={payments} />
         </section>
 
         <section className="border border-white/10 p-6">

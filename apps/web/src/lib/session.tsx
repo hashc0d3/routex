@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { clientApi, getAccessToken, setAccessToken } from "./api";
-import { ApiError, type Loyalty, type Referral, type Subscription, type User } from "./types";
+import { ApiError, type Loyalty, type Payment, type Referral, type Subscription, type User } from "./types";
 
 type Session = {
   ready: boolean;
@@ -10,6 +10,7 @@ type Session = {
   subscription: Subscription | null;
   loyalty: Loyalty | null;
   referral: Referral | null;
+  payments: Payment[];
   refresh: () => Promise<void>;
   applyAuth: (token: string) => Promise<void>;
   setUser: (user: User) => void;
@@ -24,12 +25,14 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [loyalty, setLoyalty] = useState<Loyalty | null>(null);
   const [referral, setReferral] = useState<Referral | null>(null);
+  const [payments, setPayments] = useState<Payment[]>([]);
 
   const clear = useCallback(() => {
     setUser(null);
     setSubscription(null);
     setLoyalty(null);
     setReferral(null);
+    setPayments([]);
   }, []);
 
   const refresh = useCallback(async () => {
@@ -45,6 +48,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       setSubscription(data.subscription);
       setLoyalty(data.loyalty);
       setReferral(data.referral);
+      setPayments(data.payments);
     } catch (err) {
       // выкидываем из аккаунта только при протухшем токене, а не при сбое сети
       if (err instanceof ApiError && err.code === "session_invalid") {
@@ -93,6 +97,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       subscription,
       loyalty,
       referral,
+      payments,
       refresh,
       async applyAuth(token) {
         setAccessToken(token);
@@ -105,7 +110,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         clear();
       },
     }),
-    [ready, user, subscription, loyalty, referral, refresh, clear],
+    [ready, user, subscription, loyalty, referral, payments, refresh, clear],
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

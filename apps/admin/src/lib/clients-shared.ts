@@ -13,6 +13,7 @@ export const PLAN_LABEL: Record<string, string> = {
   trial_3d: "Пробный · 3 дня",
   pro_month: "Pro · месяц",
   pro_year: "Pro · год",
+  bonus_10d: "Бонус · 10 дней",
 };
 
 export const CONSENT_LABEL: Record<string, string> = {
@@ -21,5 +22,8 @@ export const CONSENT_LABEL: Record<string, string> = {
   MARKETING: "Рассылки",
 };
 
+/** Сумма операции: деньги в рублях, бонусные дни — в бонусах (300 за операцию). */
 export const fmtMoney = (minor: number, currency = "RUB") =>
-  new Intl.NumberFormat("ru-RU", { style: "currency", currency, maximumFractionDigits: 0 }).format(minor / 100);
+  currency === "BONUS"
+    ? "300 бонусов"
+    : new Intl.NumberFormat("ru-RU", { style: "currency", currency, maximumFractionDigits: 0 }).format(minor / 100);

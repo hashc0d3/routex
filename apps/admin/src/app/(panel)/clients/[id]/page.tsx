@@ -126,9 +126,9 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <section className={card}>
-          <h2 className={h2}>Платежи</h2>
+          <h2 className={h2}>История операций</h2>
           {!billing?.payments.length ? (
-            <p className="text-sm text-white/45">Платежей нет.</p>
+            <p className="text-sm text-white/45">Операций нет.</p>
           ) : (
             <ul className="divide-y divide-white/5 text-sm">
               {billing.payments.map((p) => (
@@ -136,7 +136,7 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
                   <span className="text-white/80">{PLAN_LABEL[p.planCode] ?? p.planCode}</span>
                   <span className="font-mono">{fmtMoney(p.amountMinor, p.currency)}</span>
                   <span className={p.status === "succeeded" ? "text-emerald-300" : "text-white/45"}>
-                    {p.provider === "mock" ? "демо" : p.provider}
+                    {p.provider === "mock" ? "демо" : p.provider === "bonus" ? "бонусы" : p.provider}
                   </span>
                   <span className="text-xs text-white/40">{fmtDate(p.createdAt)}</span>
                 </li>

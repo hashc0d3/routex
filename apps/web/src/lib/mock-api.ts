@@ -8,6 +8,7 @@ import {
   type AppNotification,
   type FaqArticle,
   type Me,
+  type Payment,
   type NotificationType,
   type RegisterPayload,
   type Subscription,
@@ -34,6 +35,8 @@ type Row = {
   referralPaid: boolean;
   /** Бонусы на счету. */
   bonus: number;
+  /** Оплаты и потраченные бонусы, новые сверху. */
+  payments: Payment[];
   unlocked: UnlockedAchievement[];
   notifications: AppNotification[];
   activeSession: ActiveSession | null;
@@ -70,6 +73,7 @@ function normalize(row: Row): Row {
     referredBy: row.referredBy ?? null,
     referralPaid: row.referralPaid ?? false,
     bonus: row.bonus ?? 0,
+    payments: row.payments ?? [],
     unlocked: row.unlocked ?? [],
     notifications: row.notifications ?? [],
     activeSession: row.activeSession ?? null,
@@ -159,6 +163,7 @@ function toMe(db: Db, row: Row): Me {
     subscription: row.subscription,
     loyalty: { monthsTogether: row.paidMonths, unlocked: row.unlocked },
     referral: referralOf(db, row),
+    payments: row.payments,
   };
 }
 
@@ -234,6 +239,7 @@ export const mockApi: Api = {
       referredBy: payload.refCode?.trim().toLowerCase() || null,
       referralPaid: false,
       bonus: 0,
+      payments: [],
       unlocked: [],
       notifications: [],
       activeSession: null,
@@ -297,6 +303,13 @@ export const mockApi: Api = {
       plan: row.subscription.planCode,
       until: row.subscription.currentPeriodEnd,
     });
+    row.payments.unshift({
+      id: uuid(),
+      planCode: row.subscription.planCode,
+      amountMinor: year ? 390_000 : 49_000,
+      currency: "RUB",
+      createdAt: new Date().toISOString(),
+    });
     row.paidMonths += year ? 12 : 1;
     syncAchievements(row);
     // первая оплата приглашённого — 300 бонусов тому, кто дал ссылку
@@ -323,6 +336,7 @@ export const mockApi: Api = {
     base.setDate(base.getDate() + 10);
     row.subscription = { ...row.subscription, status: "active", trialEndsAt: null, currentPeriodEnd: base.toISOString() };
     notify(row, "bonus_spent", { days: 10, until: row.subscription.currentPeriodEnd });
+    row.payments.unshift({ id: uuid(), planCode: "bonus_10d", amountMinor: 0, currency: "BONUS", createdAt: new Date().toISOString() });
     save(db);
     return { subscription: row.subscription, loyalty: { monthsTogether: row.paidMonths, unlocked: row.unlocked }, referral: referralOf(db, row) };
   },

@@ -91,7 +91,23 @@ export class BillingService implements OnModuleInit {
         unlocked: unlocked.map((a) => ({ code: a.code, unlockedAt: a.unlockedAt.toISOString() })),
       },
       referral,
+      payments: await this.paymentsOf(userId),
     };
+  }
+
+  /** История операций по подписке: оплаты и потраченные бонусы, новые сверху. */
+  private async paymentsOf(userId: string) {
+    const sub = await this.prisma.subscription.findUnique({
+      where: { userId },
+      select: { payments: { where: { status: "succeeded" }, orderBy: { createdAt: "desc" }, take: 50 } },
+    });
+    return (sub?.payments ?? []).map((p) => ({
+      id: p.id,
+      planCode: p.planCode,
+      amountMinor: p.amountMinor,
+      currency: p.currency,
+      createdAt: p.createdAt.toISOString(),
+    }));
   }
 
   // ——— реферальная программа ———
@@ -188,6 +204,17 @@ export class BillingService implements OnModuleInit {
       await tx.subscription.update({
         where: { id: sub.id },
         data: { status: "active", trialEndsAt: null, currentPeriodEnd: end },
+      });
+      await tx.payment.create({
+        data: {
+          subscriptionId: sub.id,
+          planCode: "bonus_10d",
+          provider: "bonus",
+          providerRef: `bonus:${crypto.randomUUID()}`,
+          status: "succeeded",
+          amountMinor: 0,
+          currency: "BONUS",
+        },
       });
       await tx.notification.create({
         data: { userId, type: "bonus_spent", data: { days: BONUS_DAYS, until: end.toISOString() } },

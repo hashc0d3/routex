@@ -72,11 +72,22 @@ export type Referral = {
   claimable: boolean;
 };
 
+/** Одна операция по подписке: оплата тарифа или потраченный бонус. */
+export type Payment = {
+  id: string;
+  planCode: string;
+  /** Сумма в копейках. 0 — операция без денег, например бонусные дни. */
+  amountMinor: number;
+  currency: string;
+  createdAt: string;
+};
+
 export type Me = {
   user: User;
   subscription: Subscription;
   loyalty: Loyalty;
   referral: Referral;
+  payments: Payment[];
 };
 
 export type FaqArticle = {

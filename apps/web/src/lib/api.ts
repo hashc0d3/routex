@@ -223,7 +223,7 @@ const servicesApi: Api = {
   async me(token) {
     const [{ user }, billing] = await Promise.all([
       request<{ user: User }>(`${identityBase()}/v1/me`, { token }),
-      request<Pick<Me, "subscription" | "loyalty" | "referral">>(`${billingBase()}/v1/billing/me`, { token }),
+      request<Pick<Me, "subscription" | "loyalty" | "referral" | "payments">>(`${billingBase()}/v1/billing/me`, { token }),
     ]);
     return { user, ...billing };
   },
